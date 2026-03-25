@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>EduBot — AI Student Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2236;
+    --border: #1e3a5f;
+    --accent: #00d4ff;
+    --accent2: #7c3aed;
+    --accent3: #10b981;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --user-bubble: #1e3a5f;
+    --bot-bubble: #111827;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Syne', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ── TOP BAR ── */
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 14px 24px;
+    background: rgba(17,24,39,0.9);
+    border-bottom: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    position: relative;
+    z-index: 10;
+    flex-shrink: 0;
+  }
+
+  .brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .brand-icon {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+
+  .brand-name {
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+    background: linear-gradient(90deg, var(--accent), var(--accent2));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+
+  .brand-sub { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; letter-spacing: 1px; }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: rgba(16,185,129,0.1);
+    border: 1px solid rgba(16,185,129,0.3);
+    border-radius: 20px;
+    padding: 4px 12px;
+    font-size: 12px; color: var(--accent3);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .status-dot {
+    width: 7px; height: 7px;
+    background: var(--accent3);
+    border-radius: 50%;
+    animation: pulse 2s infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.8); }
+  }
+
+  .admin-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    padding: 6px 14px;
+    border-radius: 8px;
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .admin-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ── QUICK TOPICS ── */
+  .topics-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 24px;
+    background: rgba(17,24,39,0.6);
+    border-bottom: 1px solid rgba(30,58,95,0.4);
+    overflow-x: auto;
+    scrollbar-width: none;
+    flex-shrink: 0;
+    position: relative;
+    z-index: 5;
+  }
+  .topics-bar::-webkit-scrollbar { display: none; }
+
+  .topic-label { font-size: 11px; color: var(--muted); font-family: 'Space Mono', monospace; white-space: nowrap; margin-right: 4px; }
+
+  .topic-chip {
+    white-space: nowrap;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    color: var(--text);
+    padding: 5px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-weight: 600;
+  }
+  .topic-chip:hover { background: rgba(0,212,255,0.08); border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+
+  /* ── MAIN LAYOUT ── */
+  .main {
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+    position: relative;
+    z-index: 1;
+  }
+
+  /* ── CHAT PANEL ── */
+  .chat-panel {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  /* ── MESSAGE BUBBLES ── */
+  .msg-row {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    animation: slideIn 0.3s ease;
+  }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .msg-row.user { flex-direction: row-reverse; }
+
+  .avatar {
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    flex-shrink: 0;
+  }
+
+  .avatar.bot {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+  }
+
+  .avatar.user {
+    background: linear-gradient(135deg, var(--accent2), #db2777);
+  }
+
+  .bubble-wrap { display: flex; flex-direction: column; gap: 4px; max-width: 70%; }
+  .msg-row.user .bubble-wrap { align-items: flex-end; }
+
+  .bubble {
+    padding: 12px 16px;
+    border-radius: 16px;
+    font-size: 14px;
+    line-height: 1.6;
+    position: relative;
+  }
+
+  .bubble.bot {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-bottom-left-radius: 4px;
+    color: var(--text);
+  }
+
+  .bubble.user {
+    background: linear-gradient(135deg, #1e3a5f, #1e2a4a);
+    border: 1px solid rgba(0,212,255,0.2);
+    border-bottom-right-radius: 4px;
+    color: var(--text);
+  }
+
+  .bubble.bot strong { color: var(--accent); }
+  .bubble.bot ul { padding-left: 18px; margin-top: 6px; }
+  .bubble.bot li { margin-bottom: 4px; }
+
+  .msg-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--muted);
+    font-family: 'Space Mono', monospace;
+  }
+
+  .invalid-btn {
+    display: flex; align-items: center; gap: 4px;
+    background: transparent;
+    border: 1px solid rgba(239,68,68,0.3);
+    color: rgba(239,68,68,0.7);
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 10px;
+    cursor: pointer;
+    font-family: 'Space Mono', monospace;
+    transition: all 0.2s;
+  }
+  .invalid-btn:hover { background: rgba(239,68,68,0.1); border-color: var(--danger); color: var(--danger); }
+  .invalid-btn.flagged { background: rgba(239,68,68,0.15); border-color: var(--danger); color: var(--danger); }
+
+  /* Typing indicator */
+  .typing-indicator {
+    display: flex;
+    gap: 4px;
+    padding: 14px 16px;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    border-bottom-left-radius: 4px;
+    width: fit-content;
+  }
+  .typing-dot {
+    width: 7px; height: 7px;
+    background: var(--accent);
+    border-radius: 50%;
+    animation: typingBounce 1.2s infinite;
+  }
+  .typing-dot:nth-child(2) { animation-delay: 0.2s; }
+  .typing-dot:nth-child(3) { animation-delay: 0.4s; }
+  @keyframes typingBounce {
+    0%,60%,100% { transform: translateY(0); opacity: 0.4; }
+    30% { transform: translateY(-6px); opacity: 1; }
+  }
+
+  /* ── INPUT BAR ── */
+  .input-bar {
+    padding: 16px 24px;
+    background: rgba(17,24,39,0.9);
+    border-top: 1px solid var(--border);
+    backdrop-filter: blur(12px);
+    flex-shrink: 0;
+  }
+
+  .input-wrap {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 10px 16px;
+    transition: border-color 0.2s;
+  }
+  .input-wrap:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0,212,255,0.08); }
+
+  .chat-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    resize: none;
+    max-height: 100px;
+    line-height: 1.5;
+  }
+  .chat-input::placeholder { color: var(--muted); }
+
+  .send-btn {
+    width: 38px; height: 38px;
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 10px;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+    transition: transform 0.15s, opacity 0.15s;
+    flex-shrink: 0;
+  }
+  .send-btn:hover { transform: scale(1.05); }
+  .send-btn:active { transform: scale(0.95); }
+  .send-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+  .input-hint { font-size: 11px; color: var(--muted); text-align: center; margin-top: 8px; font-family: 'Space Mono', monospace; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 280px;
+    border-left: 1px solid var(--border);
+    background: rgba(17,24,39,0.6);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+
+  .sidebar-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .sidebar-tab {
+    flex: 1;
+    padding: 12px;
+    text-align: center;
+    font-size: 11px;
+    font-family: 'Space Mono', monospace;
+    color: var(--muted);
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+    letter-spacing: 0.5px;
+  }
+  .sidebar-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+
+  .sidebar-content { flex: 1; overflow-y: auto; padding: 16px; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+
+  .info-card {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 10px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .info-card:hover { border-color: var(--accent); transform: translateX(3px); }
+  .info-card-title { font-size: 13px; font-weight: 700; margin-bottom: 4px; color: var(--accent); }
+  .info-card-desc { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+  /* ── ADMIN MODAL ── */
+  .modal-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    backdrop-filter: blur(6px);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+  }
+  .modal-overlay.active { display: flex; }
+
+  .modal {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    width: 560px;
+    max-width: 95vw;
+    max-height: 80vh;
+    display: flex;
+    flex-direction: column;
+    animation: modalIn 0.3s ease;
+    overflow: hidden;
+  }
+
+  @keyframes modalIn {
+    from { opacity: 0; transform: scale(0.95) translateY(-10px); }
+    to { opacity: 1; transform: scale(1) translateY(0); }
+  }
+
+  .modal-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .modal-title { font-size: 18px; font-weight: 800; }
+  .modal-close { background: none; border: none; color: var(--muted); font-size: 20px; cursor: pointer; line-height: 1; transition: color 0.2s; }
+  .modal-close:hover { color: var(--text); }
+
+  .modal-body { padding: 20px 24px; overflow-y: auto; flex: 1; }
+
+  .login-form { display: flex; flex-direction: column; gap: 14px; }
+  .form-label { font-size: 12px; color: var(--muted); font-family: 'Space Mono', monospace; margin-bottom: 4px; display: block; }
+  .form-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 14px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .form-input:focus { border-color: var(--accent); }
+
+  .btn-primary {
+    background: linear-gradient(135deg, var(--accent), var(--accent2));
+    border: none;
+    border-radius: 10px;
+    padding: 12px 20px;
+    color: white;
+    font-family: 'Syne', sans-serif;
+    font-weight: 700;
+    font-size: 14px;
+    cursor: pointer;
+    transition: opacity 0.2s, transform 0.15s;
+  }
+  .btn-primary:hover { opacity: 0.9; transform: translateY(-1px); }
+
+  .btn-danger {
+    background: rgba(239,68,68,0.15);
+    border: 1px solid rgba(239,68,68,0.4);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--danger);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-danger:hover { background: rgba(239,68,68,0.25); }
+
+  .btn-success {
+    background: rgba(16,185,129,0.15);
+    border: 1px solid rgba(16,185,129,0.4);
+    border-radius: 8px;
+    padding: 6px 12px;
+    color: var(--accent3);
+    font-family: 'Space Mono', monospace;
+    font-size: 11px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-success:hover { background: rgba(16,185,129,0.25); }
+
+  /* Admin dashboard */
+  .admin-section { margin-bottom: 24px; }
+  .admin-section-title { font-size: 13px; font-weight: 800; color: var(--accent); margin-bottom: 12px; font-family: 'Space Mono', monospace; letter-spacing: 1px; text-transform: uppercase; }
+
+  .flag-item {
+    background: var(--surface2);
+    border: 1px solid rgba(239,68,68,0.2);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 8px;
+  }
+  .flag-q { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .flag-a { font-size: 13px; color: var(--text); margin-bottom: 10px; line-height: 1.5; }
+  .flag-actions { display: flex; gap: 8px; }
+
+  .qa-item {
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px;
+    margin-bottom: 8px;
+  }
+  .qa-q { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 4px; }
+  .qa-a { font-size: 13px; color: var(--muted); line-height: 1.5; }
+
+  .add-qa-form { background: var(--surface2); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-top: 12px; }
+  .add-qa-form textarea {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px;
+    color: var(--text);
+    font-family: 'Syne', sans-serif;
+    font-size: 13px;
+    resize: vertical;
+    min-height: 60px;
+    outline: none;
+    margin-bottom: 8px;
+    transition: border-color 0.2s;
+  }
+  .add-qa-form textarea:focus { border-color: var(--accent); }
+
+  .tag { display: inline-block; background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); color: var(--accent); padding: 2px 8px; border-radius: 10px; font-size: 10px; font-family: 'Space Mono', monospace; margin-right: 4px; }
+
+  /* Toast */
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(60px);
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-size: 13px;
+    font-family: 'Space Mono', monospace;
+    z-index: 200;
+    transition: transform 0.3s ease;
+    white-space: nowrap;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+  }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--accent3); color: var(--accent3); }
+  .toast.warn { border-color: var(--warn); color: var(--warn); }
+</style>
+</head>
+<body>
+
+<!-- TOP BAR -->
+<div class="topbar">
+  <div class="brand">
+    <div class="brand-icon">🎓</div>
+    <div>
+      <div class="brand-name">EduBot</div>
+      <div class="brand-sub">AI STUDENT ASSISTANT · NLP</div>
+    </div>
+  </div>
+  <div class="status-pill"><div class="status-dot"></div> ONLINE</div>
+  <button class="admin-btn" onclick="openAdminModal()">⚙ ADMIN</button>
+</div>
+
+<!-- QUICK TOPICS -->
+<div class="topics-bar">
+  <span class="topic-label">ASK ABOUT →</span>
+  <div class="topic-chip" onclick="quickAsk('What are the admission requirements?')">Admissions</div>
+  <div class="topic-chip" onclick="quickAsk('What courses are available?')">Courses</div>
+  <div class="topic-chip" onclick="quickAsk('What are the college timings?')">Timings</div>
+  <div class="topic-chip" onclick="quickAsk('Tell me about fee structure')">Fee Structure</div>
+  <div class="topic-chip" onclick="quickAsk('What clubs and extracurriculars are there?')">Campus Life</div>
+  <div class="topic-chip" onclick="quickAsk('What placement opportunities are available?')">Placements</div>
+  <div class="topic-chip" onclick="quickAsk('What is the exam schedule?')">Exams</div>
+  <div class="topic-chip" onclick="quickAsk('How do I apply for scholarships?')">Scholarships</div>
+  <div class="topic-chip" onclick="quickAsk('What hostel facilities are available?')">Hostel</div>
+</div>
+
+<!-- MAIN -->
+<div class="main">
+
+  <!-- CHAT PANEL -->
+  <div class="chat-panel">
+    <div class="messages" id="messages">
+
+      <!-- Welcome message -->
+      <div class="msg-row bot" id="welcome-msg">
+        <div class="avatar bot">🤖</div>
+        <div class="bubble-wrap">
+          <div class="bubble bot">
+            <strong>Hey there! I'm EduBot 👋</strong><br><br>
+            I'm your AI-powered college assistant. You can ask me anything about:
+            <ul>
+              <li>📋 Admissions & Enrollment</li>
+              <li>📚 Courses & Curriculum</li>
+              <li>💰 Fees & Scholarships</li>
+              <li>🏫 Campus & Facilities</li>
+              <li>📅 Events & Schedules</li>
+              <li>🎯 Placements & Careers</li>
+            </ul>
+            <br>Just type your question below — no special format needed!
+          </div>
+          <div class="msg-meta">EduBot · just now</div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- INPUT -->
+    <div class="input-bar">
+      <div class="input-wrap">
+        <textarea class="chat-input" id="chatInput" placeholder="Ask me anything about college..." rows="1"
+          onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+        <button class="send-btn" id="sendBtn" onclick="sendMessage()">➤</button>
+      </div>
+      <div class="input-hint">Powered by Claude AI · Press Enter to send · Shift+Enter for new line</div>
+    </div>
+  </div>
+
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <div class="sidebar-tab active" onclick="switchTab('info', this)">INFO</div>
+      <div class="sidebar-tab" onclick="switchTab('history', this)">HISTORY</div>
+    </div>
+    <div class="sidebar-content" id="sidebarContent">
+
+      <div id="tab-info">
+        <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:12px;letter-spacing:1px;">POPULAR TOPICS</div>
+
+        <div class="info-card" onclick="quickAsk('What are the college working hours?')">
+          <div class="info-card-title">🕐 College Hours</div>
+          <div class="info-card-desc">Mon–Sat · 8:00 AM – 5:00 PM</div>
+        </div>
+        <div class="info-card" onclick="quickAsk('When is the next semester starting?')">
+          <div class="info-card-title">📅 Next Semester</div>
+          <div class="info-card-desc">Click to check the upcoming semester dates</div>
+        </div>
+        <div class="info-card" onclick="quickAsk('How to contact the admission office?')">
+          <div class="info-card-title">📞 Admissions Office</div>
+          <div class="info-card-desc">Get contact details and office location</div>
+        </div>
+        <div class="info-card" onclick="quickAsk('What are the library timings?')">
+          <div class="info-card-title">📖 Library</div>
+          <div class="info-card-desc">Hours, digital resources & borrowing rules</div>
+        </div>
+        <div class="info-card" onclick="quickAsk('Tell me about sports facilities')">
+          <div class="info-card-title">⚽ Sports & Recreation</div>
+          <div class="info-card-desc">Grounds, gym, indoor sports & clubs</div>
+        </div>
+        <div class="info-card" onclick="quickAsk('What transport facilities are available?')">
+          <div class="info-card-title">🚌 Transport</div>
+          <div class="info-card-desc">Bus routes and shuttle schedules</div>
+        </div>
+
+        <div style="margin-top:16px;padding:12px;background:rgba(0,212,255,0.05);border:1px solid rgba(0,212,255,0.15);border-radius:10px;">
+          <div style="font-size:11px;color:var(--accent);font-family:'Space Mono',monospace;margin-bottom:6px;">💡 TIP</div>
+          <div style="font-size:12px;color:var(--muted);line-height:1.5;">If a bot answer seems wrong, tap the <span style="color:var(--danger)">⚑ Flag</span> button to notify the admin!</div>
+        </div>
+      </div>
+
+      <div id="tab-history" style="display:none;">
+        <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-bottom:12px;letter-spacing:1px;">CONVERSATION LOG</div>
+        <div id="historyList" style="font-size:12px;color:var(--muted);font-family:'Space Mono',monospace;">
+          No conversation yet.
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- ADMIN MODAL -->
+<div class="modal-overlay" id="adminModal">
+  <div class="modal">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title">⚙ Admin Portal</div>
+        <div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-top:2px;">STUDENT BOT MANAGEMENT</div>
+      </div>
+      <button class="modal-close" onclick="closeAdminModal()">✕</button>
+    </div>
+    <div class="modal-body" id="adminBody">
+
+      <!-- Login Form -->
+      <div id="adminLogin">
+        <div style="text-align:center;margin-bottom:20px;">
+          <div style="font-size:36px;margin-bottom:8px;">🔐</div>
+          <div style="font-size:16px;font-weight:700;">Admin Login</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:4px;">Use <code style="color:var(--accent)">admin</code> / <code style="color:var(--accent)">admin123</code></div>
+        </div>
+        <div class="login-form">
+          <div>
+            <label class="form-label">USERNAME</label>
+            <input class="form-input" id="adminUser" placeholder="Enter username" type="text">
+          </div>
+          <div>
+            <label class="form-label">PASSWORD</label>
+            <input class="form-input" id="adminPass" placeholder="Enter password" type="password"
+              onkeydown="if(event.key==='Enter') adminLogin()">
+          </div>
+          <button class="btn-primary" onclick="adminLogin()">LOGIN TO DASHBOARD</button>
+        </div>
+      </div>
+
+      <!-- Dashboard (hidden initially) -->
+      <div id="adminDash" style="display:none;">
+
+        <div class="admin-section">
+          <div class="admin-section-title">⚑ Flagged Answers</div>
+          <div id="flaggedList"></div>
+        </div>
+
+        <div class="admin-section">
+          <div class="admin-section-title">📚 Knowledge Base</div>
+          <div id="qaList"></div>
+          <div class="add-qa-form">
+            <div style="font-size:12px;color:var(--accent);font-family:'Space Mono',monospace;margin-bottom:10px;">+ ADD NEW Q&A</div>
+            <textarea id="newQ" placeholder="Question..."></textarea>
+            <textarea id="newA" placeholder="Answer..."></textarea>
+            <button class="btn-success" onclick="addQA()">✓ ADD TO KNOWLEDGE BASE</button>
+          </div>
+        </div>
+
+        <button class="btn-danger" onclick="adminLogout()" style="width:100%;margin-top:8px;">LOGOUT</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ── KNOWLEDGE BASE ──────────────────────────────────────
+const KB = [
+  { id: 1, q: "admission", a: "Admissions are open for the upcoming academic year! You'll need to submit your 10+2 mark sheets, ID proof, and passport photos. Entrance exams (if applicable) are held in June. Visit the admissions office on the ground floor, Block A, between 9 AM–3 PM." },
+  { id: 2, q: "courses|program|department|branch", a: "We offer undergraduate and postgraduate programs in Computer Science, Electronics, Mechanical, Civil, Business Administration, and Arts & Science. Each program spans 3–4 years. You can view the full curriculum on our website or speak with department heads." },
+  { id: 3, q: "fee|fees|tuition|cost|payment", a: "Fee structure varies by program:\n• B.Tech/BE: ₹85,000/year\n• BCA/BBA: ₹55,000/year\n• M.Tech/MBA: ₹95,000/year\nFees can be paid in two installments. Scholarships are available for merit and economically weaker sections." },
+  { id: 4, q: "timing|hours|time|schedule|open|close", a: "The college operates Monday to Saturday, 8:00 AM – 5:00 PM. Classes begin at 8:30 AM sharp. Administrative offices are open 9:00 AM – 4:30 PM. The library stays open until 7:00 PM on weekdays." },
+  { id: 5, q: "exam|test|assessment|semester exam|internal", a: "Internal assessments happen every 6 weeks. End-semester exams are conducted in November–December (Odd semester) and April–May (Even semester). Hall tickets are distributed 10 days before exams via the student portal." },
+  { id: 6, q: "scholarship|financial aid|merit", a: "We offer several scholarship programs:\n• Merit Scholarship (top 5% students): 50% fee waiver\n• Government SC/ST/OBC scholarships\n• Management scholarships for sports excellence\n• Need-based financial assistance\nApply through the student welfare office by August 31." },
+  { id: 7, q: "placement|job|career|recruit|company", a: "Our placement cell has an excellent track record! Top recruiters include TCS, Infosys, Wipro, Cognizant, and many startups. Last year's stats:\n• 85% placement rate\n• Highest package: ₹18 LPA\n• Average package: ₹5.2 LPA\nTraining sessions begin in 3rd year." },
+  { id: 8, q: "hostel|accommodation|stay|dorm", a: "Hostel facilities are available separately for boys and girls. Monthly charges: ₹4,500 (shared room) or ₹7,000 (single room), including meals. The hostels have 24/7 security, Wi-Fi, laundry, and a common room. Apply early — seats fill fast!" },
+  { id: 9, q: "library|books|resources|journal", a: "Our central library has over 50,000 books, 200+ journals, and full access to digital databases like IEEE, Springer, and JSTOR. Library hours: Mon–Fri 8AM–7PM, Sat 9AM–5PM. You can borrow up to 4 books for 14 days using your student ID." },
+  { id: 10, q: "club|activity|extracurricular|cultural|sports|event", a: "We have 30+ student clubs including:\n• Coding & Robotics Club\n• Cultural Arts Society\n• NSS & NCC units\n• Entrepreneurship Cell\n• Music, Dance & Drama clubs\n• Sports teams (cricket, football, basketball, chess)\nAnnual Fest 'Illumina' happens every February!" },
+  { id: 11, q: "transport|bus|shuttle|travel", a: "College buses operate on 12 routes covering major areas. Passes cost ₹1,200/month. GPS tracking is available on our app. Contact the transport office at ext. 204 for route details. A shuttle service also runs between the campus gates every 20 minutes." },
+  { id: 12, q: "contact|phone|email|address|reach|office", a: "You can reach us at:\n📞 Main: +91-44-2678-XXXX\n📧 Email: info@college.edu.in\n🌐 Website: www.college.edu.in\n📍 Address: 123 Education Road, Chennai - 600001\nFor specific departments, visit the respective offices or use the student portal." },
+  { id: 13, q: "wifi|internet|network|connectivity", a: "The campus has high-speed Wi-Fi (500 Mbps) across all buildings including hostels. Use your student credentials (student ID + DOB) to connect. Report connectivity issues to the IT helpdesk at Room 105, Tech Block." },
+  { id: 14, q: "canteen|food|cafeteria|mess|eat|lunch", a: "The main canteen serves breakfast (7:30–9 AM), lunch (12–2 PM), and snacks (4–6 PM). A separate mess with vegetarian and non-vegetarian options operates in the hostel. Monthly mess plan: ₹2,200. Stalls for street food and juice are open all day!" },
+  { id: 15, q: "semester|academic calendar|holiday|vacation", a: "The academic year runs July–November (Odd Sem) and January–May (Even Sem). Major holidays include Diwali week, Pongal holidays, summer vacation (May–June), and national holidays. The full academic calendar is posted on the student portal in June." },
+];
+
+// State
+let flaggedItems = [];
+let conversationHistory = [];
+let isTyping = false;
+let msgIdCounter = 0;
+let adminLoggedIn = false;
+
+// ── CORE CHAT ───────────────────────────────────────────
+async function sendMessage() {
+  const input = document.getElementById('chatInput');
+  const text = input.value.trim();
+  if (!text || isTyping) return;
+
+  input.value = '';
+  input.style.height = 'auto';
+  addUserMessage(text);
+  conversationHistory.push({ role: 'user', content: text });
+
+  showTyping();
+  document.getElementById('sendBtn').disabled = true;
+
+  try {
+    const botReply = await getBotReply(text);
+    hideTyping();
+    const msgId = ++msgIdCounter;
+    addBotMessage(botReply, msgId, text);
+    conversationHistory.push({ role: 'assistant', content: botReply });
+    updateHistory(text, botReply);
+  } catch (err) {
+    hideTyping();
+    addBotMessage("Sorry, I'm having trouble connecting right now. Please try again in a moment.", ++msgIdCounter, text);
+  }
+
+  document.getElementById('sendBtn').disabled = false;
+}
+
+async function getBotReply(userText) {
+  const lower = userText.toLowerCase();
+
+  // Check KB first
+  for (const entry of KB) {
+    const keywords = entry.q.split('|');
+    if (keywords.some(k => lower.includes(k))) {
+      return entry.a;
+    }
+  }
+
+  // Fall back to Claude API
+  const systemPrompt = `You are EduBot, a friendly and knowledgeable AI assistant for a college. 
+You help students with queries about college admissions, courses, fees, campus life, exams, placements, hostels, library, transport, and all college-related topics.
+Keep responses concise (3-5 sentences), warm, and helpful. Use emojis sparingly. Format with line breaks when listing items.
+You represent a college in Chennai, India. All fees are in Indian Rupees.
+If asked something completely unrelated to college, politely redirect to college topics.`;
+
+  const messages = [
+    ...conversationHistory.slice(-6), // last 3 turns for context
+    { role: 'user', content: userText }
+  ];
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 400,
+      system: systemPrompt,
+      messages: messages
+    })
+  });
+
+  if (!response.ok) throw new Error('API error');
+  const data = await response.json();
+  return data.content[0].text;
+}
+
+// ── MESSAGE RENDERING ───────────────────────────────────
+function addUserMessage(text) {
+  const messagesEl = document.getElementById('messages');
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const row = document.createElement('div');
+  row.className = 'msg-row user';
+  row.innerHTML = `
+    <div class="bubble-wrap">
+      <div class="bubble user">${escapeHtml(text)}</div>
+      <div class="msg-meta">${time}</div>
+    </div>
+    <div class="avatar user">👤</div>
+  `;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function addBotMessage(text, msgId, originalQ) {
+  const messagesEl = document.getElementById('messages');
+  const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  const formatted = formatBotText(text);
+  row.innerHTML = `
+    <div class="avatar bot">🤖</div>
+    <div class="bubble-wrap">
+      <div class="bubble bot" id="bubble-${msgId}">${formatted}</div>
+      <div class="msg-meta">
+        EduBot · ${time}
+        <button class="invalid-btn" id="flag-${msgId}" onclick="flagAnswer(${msgId}, \`${escapeQ(originalQ)}\`, \`${escapeQ(text)}\`)">
+          ⚑ Flag
+        </button>
+      </div>
+    </div>
+  `;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function formatBotText(text) {
+  return escapeHtml(text)
+    .replace(/\n/g, '<br>')
+    .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+    .replace(/•\s(.+)/g, '<li>$1</li>');
+}
+
+function escapeHtml(text) {
+  return text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function escapeQ(text) {
+  return text.replace(/`/g, "'").replace(/\\/g, '\\\\').substring(0, 200);
+}
+
+let typingEl = null;
+function showTyping() {
+  isTyping = true;
+  const messagesEl = document.getElementById('messages');
+  const row = document.createElement('div');
+  row.className = 'msg-row bot';
+  row.id = 'typing-row';
+  row.innerHTML = `
+    <div class="avatar bot">🤖</div>
+    <div class="typing-indicator">
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+      <div class="typing-dot"></div>
+    </div>
+  `;
+  messagesEl.appendChild(row);
+  scrollBottom();
+}
+
+function hideTyping() {
+  isTyping = false;
+  const el = document.getElementById('typing-row');
+  if (el) el.remove();
+}
+
+function scrollBottom() {
+  const el = document.getElementById('messages');
+  el.scrollTop = el.scrollHeight;
+}
+
+// ── INPUT ───────────────────────────────────────────────
+function handleKey(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    sendMessage();
+  }
+}
+
+function autoResize(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+}
+
+function quickAsk(text) {
+  const input = document.getElementById('chatInput');
+  input.value = text;
+  sendMessage();
+}
+
+// ── SIDEBAR ─────────────────────────────────────────────
+function switchTab(tab, el) {
+  document.querySelectorAll('.sidebar-tab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-info').style.display = tab === 'info' ? '' : 'none';
+  document.getElementById('tab-history').style.display = tab === 'history' ? '' : 'none';
+}
+
+function updateHistory(q, a) {
+  const el = document.getElementById('historyList');
+  const item = document.createElement('div');
+  item.style.cssText = 'background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:10px;margin-bottom:8px;cursor:pointer;';
+  item.innerHTML = `<div style="color:var(--accent);margin-bottom:4px;font-size:11px;">Q: ${q.substring(0,50)}${q.length>50?'...':''}</div>`;
+  item.onclick = () => {
+    switchTab('info', document.querySelectorAll('.sidebar-tab')[0]);
+  };
+  if (el.textContent.trim() === 'No conversation yet.') el.innerHTML = '';
+  el.insertBefore(item, el.firstChild);
+}
+
+// ── FLAG / INVALID ──────────────────────────────────────
+function flagAnswer(msgId, question, answer) {
+  const btn = document.getElementById(`flag-${msgId}`);
+  if (btn.classList.contains('flagged')) {
+    showToast('Already flagged!', 'warn');
+    return;
+  }
+  btn.classList.add('flagged');
+  btn.textContent = '⚑ Flagged';
+
+  flaggedItems.push({
+    id: Date.now(),
+    msgId,
+    question,
+    answer,
+    time: new Date().toLocaleString()
+  });
+
+  showToast('✓ Flagged! Admin has been notified.', 'success');
+}
+
+// ── ADMIN ───────────────────────────────────────────────
+function openAdminModal() {
+  document.getElementById('adminModal').classList.add('active');
+  if (adminLoggedIn) renderDashboard();
+}
+
+function closeAdminModal() {
+  document.getElementById('adminModal').classList.remove('active');
+}
+
+function adminLogin() {
+  const u = document.getElementById('adminUser').value;
+  const p = document.getElementById('adminPass').value;
+  if (u === 'admin' && p === 'admin123') {
+    adminLoggedIn = true;
+    document.getElementById('adminLogin').style.display = 'none';
+    document.getElementById('adminDash').style.display = '';
+    renderDashboard();
+  } else {
+    showToast('Invalid credentials!', 'warn');
+  }
+}
+
+function adminLogout() {
+  adminLoggedIn = false;
+  document.getElementById('adminLogin').style.display = '';
+  document.getElementById('adminDash').style.display = 'none';
+  document.getElementById('adminUser').value = '';
+  document.getElementById('adminPass').value = '';
+  closeAdminModal();
+}
+
+function renderDashboard() {
+  renderFlagged();
+  renderQA();
+}
+
+function renderFlagged() {
+  const el = document.getElementById('flaggedList');
+  if (flaggedItems.length === 0) {
+    el.innerHTML = `<div style="font-size:12px;color:var(--muted);padding:12px;text-align:center;font-family:'Space Mono',monospace;">No flagged answers yet. ✓</div>`;
+    return;
+  }
+  el.innerHTML = flaggedItems.map(item => `
+    <div class="flag-item" id="fi-${item.id}">
+      <div class="flag-q">❓ ${item.question}</div>
+      <div class="flag-a">${item.answer.substring(0, 120)}${item.answer.length > 120 ? '...' : ''}</div>
+      <div style="font-size:10px;color:var(--muted);margin-bottom:8px;font-family:'Space Mono',monospace;">Flagged: ${item.time}</div>
+      <div class="flag-actions">
+        <button class="btn-danger" onclick="deleteFlagged(${item.id})">🗑 Delete Answer</button>
+        <button class="btn-success" onclick="promptEdit(${item.id})">✎ Edit Answer</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+function deleteFlagged(id) {
+  flaggedItems = flaggedItems.filter(f => f.id !== id);
+  renderFlagged();
+  showToast('Answer removed from queue.', 'success');
+}
+
+function promptEdit(id) {
+  const item = flaggedItems.find(f => f.id === id);
+  document.getElementById('newQ').value = item.question;
+  document.getElementById('newA').value = '';
+  document.getElementById('newA').focus();
+  showToast('Edit the answer in the Add Q&A form below ↓', 'warn');
+}
+
+function renderQA() {
+  const el = document.getElementById('qaList');
+  el.innerHTML = KB.slice(0, 6).map(entry => `
+    <div class="qa-item">
+      <div class="qa-q">Q: ${entry.q.replace(/\|/g, ', ')}</div>
+      <div class="qa-a">${entry.a.substring(0, 100)}...</div>
+    </div>
+  `).join('') + `<div style="font-size:11px;color:var(--muted);font-family:'Space Mono',monospace;margin-top:8px;">... and ${KB.length - 6} more entries in knowledge base</div>`;
+}
+
+function addQA() {
+  const q = document.getElementById('newQ').value.trim();
+  const a = document.getElementById('newA').value.trim();
+  if (!q || !a) { showToast('Fill in both question and answer!', 'warn'); return; }
+  KB.push({ id: Date.now(), q: q.toLowerCase(), a });
+  document.getElementById('newQ').value = '';
+  document.getElementById('newA').value = '';
+  renderQA();
+  showToast('✓ Added to knowledge base!', 'success');
+}
+
+// ── TOAST ───────────────────────────────────────────────
+function showToast(msg, type = 'success') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `toast ${type} show`;
+  setTimeout(() => { t.classList.remove('show'); }, 3000);
+}
+
+// ── INIT ─────────────────────────────────────────────────
+document.addEventListener('click', (e) => {
+  if (e.target === document.getElementById('adminModal')) closeAdminModal();
+});
+</script>
+</body>
+</html>

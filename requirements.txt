@@ -1,0 +1,16 @@
+# EduBot — Python dependencies
+# Only needed if you run the optional proxy server (server.py)
+# For pure static hosting, no Python dependencies are required.
+
+# Local development server
+flask==3.1.0
+flask-cors==5.0.0
+
+# Environment variable management
+python-dotenv==1.0.1
+
+# HTTP requests (for proxy to Anthropic API)
+requests==2.32.3
+
+# Optional: production WSGI server
+gunicorn==23.0.0
